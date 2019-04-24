@@ -1,0 +1,33 @@
+{
+  "name": "remittance-contracts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "truffle-config.js",
+  "author": "Alessandro Rusani",
+  "license": "ISC",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build": "truffle compile",
+    "clean": "rm -rf node_modules build",
+    "coverage": "node_modules/.bin/solidity-coverage",
+    "lint": "npm run lint:sol && npm run lint:js",
+    "lint:js": "eslint test/*.js",
+    "lint:sol": "solium -d contracts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "openzeppelin-solidity": "2.1.1"
+  },
+  "devDependencies": {
+    "bn-chai": "^1.0.1",
+    "chai": "^4.1.2",
+    "chai-as-promised": "^7.1.1",
+    "eslint": "^5.16.0",
+    "eslint-config-google": "^0.12.0",
+    "ethereumjs-testrpc-sc": "^6.1.6",
+    "solidity-coverage": "https://github.com/leapdao/solidity-coverage#master",
+    "solium": "^1.2.4"
+  }
+}

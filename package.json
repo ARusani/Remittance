@@ -1,0 +1,25 @@
+{
+  "name": "remittance",
+  "description": "Monorepo for Remittance project",
+  "repository": "git@github.com:ARusani/Remittance.git",
+  "author": "Alessandro Rusani",
+  "license": "ISC",
+  "version": "1.0.0",
+  "workspaces": [
+    "remittance-app",
+    "remittance-contracts"
+  ],
+  "dependencies": {
+    "wsrun": "^2.2.1"
+  },
+  "scripts": {
+    "build": "yarn wsrun build --stages",
+    "lint": "yarn wsrun lint --stages",
+    "start": "cd remittance-app/ && yarn start"
+  },
+  "engines": {
+    "node": "^11.0"
+  },
+  "main": "index.js",
+  "private": true
+}
