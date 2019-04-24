@@ -7,8 +7,8 @@
     "react-dom": "^16.8.6",
     "react-scripts": "3.0.0",
     "remittance-contracts": "^1.0.0",
-    "truffle-contract": "^4.0.12",
-    "web3": "^1.0.0-beta.52"
+    "truffle-contract": "3.0.6",
+    "web3": "1.0.0-beta.37"
   },
   "scripts": {
     "start": "react-scripts start",
