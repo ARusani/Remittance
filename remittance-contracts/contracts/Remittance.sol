@@ -25,12 +25,13 @@ contract Remittance is Stoppable {
         uint256 etherDrop
     );
 
-    event EventWithdraw(
+    event EventWithdrawRemittance(
         address indexed caller,
         address indexed payer,
         uint256 etherAmount
     );
 
+    /* limit to how far in the future the deadline can be, in seconds from now */
     uint256 public maxFarInTheFuture;
 
 
@@ -50,6 +51,7 @@ contract Remittance is Stoppable {
         emit EventRemittanceCreated(msg.sender, maxFarInTheFuture);
     }
 
+    /* Generate a unique password that is not possible to reuse deposit */
     function oneTimePassword(bytes32 _codeHash1, bytes32 _codeHash2, address _beneficiaryAddress) public pure returns(bytes32 password) {
         require(_codeHash1 != 0, "First code is null");
         require(_codeHash2 != 0, "Second code is null");
@@ -80,12 +82,11 @@ contract Remittance is Stoppable {
        
         require(fund.sender != address(0), "Deposit not exist");
         require(now <= fund.deadline, "Time greater than limit");
-        require(msg.sender != fund.sender, "Deposer can not withdraw");
 
         fund.etherAmount = 0;
         fund.deadline = 0;
 
-        emit EventWithdraw(msg.sender, fund.sender, etherAmount);
+        emit EventWithdrawRemittance(msg.sender, fund.sender, etherAmount);
 
         msg.sender.transfer(etherAmount);
     }
