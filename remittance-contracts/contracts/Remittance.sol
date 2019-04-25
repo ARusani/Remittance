@@ -1,10 +1,10 @@
 pragma solidity ^0.5.0;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "./Killable.sol";
+import "./Stoppable.sol";
 
 
-contract Remittance is Killable {
+contract Remittance is Stoppable {
     using SafeMath for uint256;
 
     event EventRemittanceCreated(
@@ -19,13 +19,13 @@ contract Remittance is Killable {
         uint256 etherAmount
     );
 
-    event EventClaimFund(
+    event EventCancelRemittance(
         address indexed caller,
         bytes32 password,
         uint256 etherDrop
     );
 
-    event EventWithdrawFund(
+    event EventWithdraw(
         address indexed caller,
         address indexed payer,
         uint256 etherAmount
@@ -40,6 +40,7 @@ contract Remittance is Killable {
         uint256 deadline;
     }
 
+    /* use the hash of the secret codes and beneficiary Address as key of the remittance */
     mapping(bytes32 => Fund) public funds;
 
     constructor (uint256 _maxFarInTheFuture) public {
@@ -49,61 +50,57 @@ contract Remittance is Killable {
         emit EventRemittanceCreated(msg.sender, maxFarInTheFuture);
     }
 
-    function otp(bytes32 _code1, bytes32 _code2, uint256 _etherAmount) public pure returns(bytes32 password) {
-        require(_code1 != 0, "First code is null");
-        require(_code2 != 0, "Second code is null");
-        require(_etherAmount != 0, "Ethers amount can not be zero");
-        return keccak256(abi.encodePacked(_code1, _code2,_etherAmount));
+    function oneTimePassword(bytes32 _codeHash1, bytes32 _codeHash2, address _beneficiaryAddress) public pure returns(bytes32 password) {
+        require(_codeHash1 != 0, "First code is null");
+        require(_codeHash2 != 0, "Second code is null");
+        require(_beneficiaryAddress != address(0), "_beneficiaryAddress is null");
+        return keccak256(abi.encodePacked(_codeHash1, _codeHash2,_beneficiaryAddress));
     }
 
-    function depositFund(bytes32 _password, uint256 _deadline) public payable {
+    function depositFund(bytes32 _password, uint256 _deadline) public payable notStopped {
         require(now < _deadline && _deadline < maxFarInTheFuture, "deadline is not valid");
-        uint256 etherAmount = msg.value; 
-        require(etherAmount != 0, "Funds deposited is zero");
+
+        require(msg.value != 0, "Funds deposited is zero");
 
         Fund storage fund = funds[_password];
-        require (fund.sender == address(0), "Fund already deposited");
+        require (fund.sender == address(0), "_password already used");
 
         fund.sender = msg.sender;
-        fund.etherAmount = etherAmount;
+        fund.etherAmount =  msg.value;
         fund.deadline = _deadline;
 
-        emit EventDepositFund(msg.sender, _password, _deadline, etherAmount);
+        emit EventDepositFund(msg.sender, _password, _deadline,  msg.value);
     }
 
-    function withdrawFund(bytes32 _code1, bytes32 _code2,uint256 _etherAmount) public {
-        bytes32 password = otp(_code1,_code2,_etherAmount);
+    function withdrawRemittance(bytes32 _codeHash1, bytes32 _codeHash2) public notStopped {
+        bytes32 password = oneTimePassword(_codeHash1,_codeHash2,msg.sender);
         Fund storage fund = funds[password];
 
         uint256 etherAmount = fund.etherAmount;
-        address payer = fund.sender;
-        
-        require(payer != address(0), "Deposit not exist");
+       
+        require(fund.sender != address(0), "Deposit not exist");
         require(now <= fund.deadline, "Time greater than limit");
-        require(msg.sender != payer, "Deposer can not withdraw");
+        require(msg.sender != fund.sender, "Deposer can not withdraw");
 
-        fund.sender = address(0);
         fund.etherAmount = 0;
         fund.deadline = 0;
 
-        emit EventWithdrawFund(msg.sender, payer, etherAmount);
+        emit EventWithdraw(msg.sender, fund.sender, etherAmount);
 
         msg.sender.transfer(etherAmount);
     }
 
-    function claimFund(bytes32 _code1, bytes32 _code2,uint256 _etherAmount) public {
-        bytes32 password = otp(_code1,_code2,_etherAmount);
-        Fund storage fund = funds[password];
-        require(fund.sender != address(0), "Fund does not exist");
+    function cancelRemittance(bytes32 _password) public notStopped {
+        Fund storage fund = funds[_password];
+        require(fund.etherAmount != 0, "Fund does not exist");
         require(msg.sender == fund.sender, "Invalid Claimer");
         require(now > fund.deadline, "Too early for claim");
 
         uint256 etherDrop = fund.etherAmount;
-        fund.sender = address(0);
         fund.etherAmount = 0;
         fund.deadline = 0;
 
-        emit EventClaimFund(msg.sender, password, etherDrop);
+        emit EventCancelRemittance(msg.sender, _password, etherDrop);
         msg.sender.transfer(etherDrop);
     }
 }
