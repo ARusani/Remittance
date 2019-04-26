@@ -15,23 +15,23 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const duration = {
   seconds: function(value) {
-return value;
-},
+    return value;
+  },
   minutes: function(value) {
-return value * this.seconds(60);
-},
+    return value * this.seconds(60);
+  },
   hours: function(value) {
-return value * this.minutes(60);
-},
+    return value * this.minutes(60);
+  },
   days: function(value) {
-return value * this.hours(24);
-},
+    return value * this.hours(24);
+  },
   weeks: function(value) {
-return value * this.days(7);
-},
+    return value * this.days(7);
+  },
   years: function(value) {
-return value * this.days(365);
-},
+    return value * this.days(365);
+  },
 };
 
 require('chai')
@@ -92,9 +92,9 @@ contract('Remittance', (accounts) => {
       let remittanceInstance;
 
       const allowedPasswords = [
-        {code1: sha3('ether'), code2: sha3('gwei'), etherAmount: toWei('0.5', 'ether')},
-        {code1: sha3('Frankly, my dear, I do not give a damn.'), code2: sha3('After all, tomorrow is another day!”'), etherAmount: toWei('100', 'szabo')},
-        {code1: sha3('May the Force be with you.'), code2: sha3('Do. Or do not. There is no try.'), etherAmount: toWei('1', 'ether')},
+        {code1: fromAscii('ether').padEnd(66, '0'), code2: fromAscii('gwei').padEnd(66, '0'), etherAmount: toWei('0.5', 'ether')},
+        {code1: fromAscii('Frankly, my dear, I do not giv').padEnd(66, '0'), code2: fromAscii('After all, tomorrow is another”').padEnd(66, '0'), etherAmount: toWei('100', 'szabo')},
+        {code1: fromAscii('May the Force be with you.').padEnd(66, '0'), code2: fromAscii('Do. Or do not. There is no try.').padEnd(66, '0'), etherAmount: toWei('1', 'ether')},
       ];
 
       let password;
@@ -123,14 +123,14 @@ contract('Remittance', (accounts) => {
         describe('fail', () => {
           it('if called with code1 null ', async () => {
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.oneTimePassword(fromAscii(''), allowedPasswords[0].code2, carol,
+              return remittanceInstance.oneTimePassword(fromAscii('').padEnd(66, '0'), allowedPasswords[0].code2, carol,
                   {from: alice});
             }, MAX_GAS);
           });
 
           it('if called with code2 null ', async () => {
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.oneTimePassword(allowedPasswords[0].code1, fromAscii(''), carol,
+              return remittanceInstance.oneTimePassword(allowedPasswords[0].code1, fromAscii('').padEnd(66, '0'), carol,
                   {from: alice});
             }, MAX_GAS);
           });
