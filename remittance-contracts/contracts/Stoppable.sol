@@ -20,7 +20,8 @@ contract Stoppable is Ownable {
         _;
     }
 
-    constructor () internal {
+    constructor (bool _asStopped) internal {
+        stopped = _asStopped;
     }
 
     function stop() public onlyOwner notStopped  {

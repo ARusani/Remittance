@@ -62,10 +62,9 @@ contract('Remittance', (accounts) => {
     describe('costructor', () => {
       describe('should allowed', () => {
         it('and emit EventRemittanceCreated', async () => {
-          const latestBlock = await getBlock('latest');
-          const maxFarInTheFuture = latestBlock.timestamp + duration.years(1);
+          const maxFarInTheFuture = duration.years(1);
 
-          const remittanceInstance = await Remittance.new(maxFarInTheFuture,
+          const remittanceInstance = await Remittance.new(maxFarInTheFuture, false,
               {from: alice}).should.be.fulfilled;
           const receipt = await web3.eth.getTransactionReceiptMined(remittanceInstance.transactionHash);
 
@@ -76,9 +75,8 @@ contract('Remittance', (accounts) => {
       });
 
       describe('should fail', () => {
-        it('if maxFarInTheFuture is in the past', async () => {
-          const latestBlock = await getBlock('latest');
-          const maxFarInTheFuture = latestBlock.timestamp - duration.seconds(10);
+        it('if maxFarInTheFuture is 0', async () => {
+          const maxFarInTheFuture = 0;
 
           await web3.eth.expectedExceptionPromise(() => {
             return Remittance.new(maxFarInTheFuture,
@@ -92,52 +90,43 @@ contract('Remittance', (accounts) => {
       let remittanceInstance;
 
       const allowedPasswords = [
-        {code1: fromAscii('ether').padEnd(66, '0'), code2: fromAscii('gwei').padEnd(66, '0'), etherAmount: toWei('0.5', 'ether')},
-        {code1: fromAscii('Frankly, my dear, I do not giv').padEnd(66, '0'), code2: fromAscii('After all, tomorrow is another”').padEnd(66, '0'), etherAmount: toWei('100', 'szabo')},
-        {code1: fromAscii('May the Force be with you.').padEnd(66, '0'), code2: fromAscii('Do. Or do not. There is no try.').padEnd(66, '0'), etherAmount: toWei('1', 'ether')},
+        {code: fromAscii('gwei').padEnd(66, '0'), etherAmount: toWei('0.5', 'ether')},
+        {code: fromAscii('After all, tomorrow is another”').padEnd(66, '0'), etherAmount: toWei('100', 'szabo')},
+        {code: fromAscii('Do. Or do not. There is no try.').padEnd(66, '0'), etherAmount: toWei('1', 'ether')},
       ];
 
       let password;
-
       beforeEach('should deploy Remittance instance', async () => {
-        const latestBlock = await getBlock('latest');
-        const maxFarInTheFuture = latestBlock.timestamp + duration.years(1);
+        const maxFarInTheFuture = duration.years(1);
 
-        remittanceInstance = await Remittance.new(maxFarInTheFuture,
+        remittanceInstance = await Remittance.new(maxFarInTheFuture, false,
             {from: alice}).should.be.fulfilled;
-        password = await remittanceInstance.oneTimePassword(allowedPasswords[0].code1, allowedPasswords[0].code2, carol);
+        password = await remittanceInstance.oneTimePassword(allowedPasswords[0].code, carol);
       });
 
       describe('#oneTimePassword()', () => {
         describe('allowed', () => {
           allowedPasswords.forEach((values) => {
-            it(`to use code1= ${values.code1} and code2= ${values.code2}`, async () => {
-              const otp1 = await remittanceInstance.oneTimePassword(values.code1, values.code2, carol,
+            it(`to use code= ${values.code}`, async () => {
+              const otp1 = await remittanceInstance.oneTimePassword(values.code, carol,
                   {from: alice});
 
-              otp1.should.be.equal(soliditySha3(values.code1, values.code2, carol));
+              otp1.should.be.equal(soliditySha3(values.code, carol));
             });
           });
         });
 
         describe('fail', () => {
-          it('if called with code1 null ', async () => {
+          it('if called with code null ', async () => {
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.oneTimePassword(fromAscii('').padEnd(66, '0'), allowedPasswords[0].code2, carol,
-                  {from: alice});
-            }, MAX_GAS);
-          });
-
-          it('if called with code2 null ', async () => {
-            await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.oneTimePassword(allowedPasswords[0].code1, fromAscii('').padEnd(66, '0'), carol,
+              return remittanceInstance.oneTimePassword(fromAscii('').padEnd(66, '0'), carol,
                   {from: alice});
             }, MAX_GAS);
           });
 
           it('if called with exchanger address = address(0)', async () => {
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.oneTimePassword(allowedPasswords[0].code1, allowedPasswords[0].code2, ZERO_ADDRESS,
+              return remittanceInstance.oneTimePassword(allowedPasswords[0].code, ZERO_ADDRESS,
                   {from: alice});
             }, MAX_GAS);
           });
@@ -146,77 +135,67 @@ contract('Remittance', (accounts) => {
 
       describe('#depositFund()', () => {
         describe('allowed', () => {
-          it('if called with valid codes and amount ', async () => {
+          it('if called with valid code and amount ', async () => {
             const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.hours(1);
-
-            const result = await remittanceInstance.depositFund(password, deadline,
+            const releaseTime = latestBlock.timestamp + duration.hours(1);
+            
+            const result = await remittanceInstance.depositFund(password, duration.hours(1),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS});
 
             result.logs[0].event.should.be.equal('EventDepositFund');
             result.logs[0].args.caller.should.be.equal(alice);
-            result.logs[0].args.password.should.be.equal(soliditySha3(allowedPasswords[0].code1, allowedPasswords[0].code2, carol));
-            result.logs[0].args.deadline.should.be.eq.BN(deadline);
+            result.logs[0].args.password.should.be.equal(soliditySha3(allowedPasswords[0].code, carol));
+            result.logs[0].args.releaseTime.should.be.eq.BN(releaseTime);
             result.logs[0].args.etherAmount.should.be.eq.BN(allowedPasswords[0].etherAmount);
           });
 
           it('if deposited from any user ', async () => {
             const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.hours(1);
-            const result = await remittanceInstance.depositFund(password, deadline,
+            const releaseTime = latestBlock.timestamp + duration.hours(1);
+            const result = await remittanceInstance.depositFund(password, duration.hours(1),
                 {from: david, value: allowedPasswords[0].etherAmount, gas: MAX_GAS});
 
             result.logs[0].event.should.be.equal('EventDepositFund');
             result.logs[0].args.caller.should.be.equal(david);
-            result.logs[0].args.password.should.be.equal(soliditySha3(allowedPasswords[0].code1, allowedPasswords[0].code2, carol));
-            result.logs[0].args.deadline.should.be.eq.BN(deadline);
+            result.logs[0].args.password.should.be.equal(soliditySha3(allowedPasswords[0].code, carol));
+            result.logs[0].args.releaseTime.should.be.eq.BN(releaseTime);
             result.logs[0].args.etherAmount.should.be.eq.BN(allowedPasswords[0].etherAmount);
           });
         });
 
         describe('fail', () => {
           it('if called with invalid deadline ', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadlines = [latestBlock.timestamp - 10, latestBlock.timestamp + duration.years(2)];
+            const seconds = [0, duration.years(2)];
 
-            deadlines.forEach(async (deadline) => {
+            seconds.forEach(async (deadine) => {
               await web3.eth.expectedExceptionPromise(() => {
-                return remittanceInstance.depositFund(password, deadline,
+                return remittanceInstance.depositFund(password, deadine,
                     {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS});
               }, MAX_GAS);
             });
           });
 
           it.skip('if called with sender = address(0)', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.minutes(2);
-
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.depositFund(password, deadline,
+              return remittanceInstance.depositFund(password, duration.minutes(2),
                   {from: ZERO_ADDRESS, value: allowedPasswords[0].etherAmount, gas: MAX_GAS});
             }, MAX_GAS);
           });
 
           it('if called with amount = 0', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.minutes(2);
-
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.depositFund(password, deadline,
+              return remittanceInstance.depositFund(password, duration.minutes(2),
                   {from: alice, value: 0, gas: MAX_GAS});
             }, MAX_GAS);
           });
 
           it('if called with password already deposited', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.minutes(2);
-
-            await remittanceInstance.depositFund(password, deadline,
+            await remittanceInstance.depositFund(password, duration.minutes(2),
                 {from: alice, value: allowedPasswords[1].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
 
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.depositFund(password, deadline,
+              return remittanceInstance.depositFund(password, duration.minutes(2),
                   {from: alice, value: 0, gas: MAX_GAS});
             }, MAX_GAS);
           });
@@ -224,11 +203,9 @@ contract('Remittance', (accounts) => {
           it('if called when stopped', async () => {
             await remittanceInstance.stop()
                 .should.be.fulfilled;
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.hours(1);
 
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.depositFund(password, deadline,
+              return remittanceInstance.depositFund(password, duration.hours(1),
                   {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS});
             }, MAX_GAS);
           });
@@ -238,15 +215,13 @@ contract('Remittance', (accounts) => {
       describe('#withdrawRemittance()', () => {
         describe('allowed', () => {
           beforeEach('should deposit fund', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.hours(1);
-            await remittanceInstance.depositFund(password, deadline,
+            await remittanceInstance.depositFund(password, duration.hours(1),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
           });
 
           it('if called in time with valid data and emit Event ', async () => {
-            const result = await remittanceInstance.withdrawRemittance(allowedPasswords[0].code1, allowedPasswords[0].code2,
+            const result = await remittanceInstance.withdrawRemittance(allowedPasswords[0].code,
                 {from: carol});
 
             result.logs[0].event.should.be.equal('EventWithdrawRemittance');
@@ -258,7 +233,7 @@ contract('Remittance', (accounts) => {
           it('if called in time and caller receive amount ', async () => {
             const preCarolBalance = new BN(await getBalance(carol));
 
-            const result = await remittanceInstance.withdrawRemittance(allowedPasswords[0].code1, allowedPasswords[0].code2,
+            const result = await remittanceInstance.withdrawRemittance(allowedPasswords[0].code,
                 {from: carol}).should.be.fulfilled;
 
             const gasUsedWithdrawRemittance = new BN(result.receipt.gasUsed);
@@ -269,41 +244,37 @@ contract('Remittance', (accounts) => {
 
             postCarolBalance.should.be.eq.BN((preCarolBalance.add(new BN(allowedPasswords[0].etherAmount))).sub(totalGas));
           });
+
+          it('if called not in time', async () => {
+            await web3.evm.increaseTime(duration.hours(2));
+            await remittanceInstance.withdrawRemittance(allowedPasswords[0].code,
+                {from: carol}).should.be.fulfilled;
+          });
         });
 
         describe('fail', () => {
           let password1;
           beforeEach('before deposit fund', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.seconds(10);
-            await remittanceInstance.depositFund(password, deadline,
+            await remittanceInstance.depositFund(password, duration.seconds(10),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
 
-            password1 = await remittanceInstance.oneTimePassword(allowedPasswords[0].code1, allowedPasswords[0].code2, alice);
-            await remittanceInstance.depositFund(password1, deadline,
-                {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS})
+            password1 = await remittanceInstance.oneTimePassword(allowedPasswords[1].code, alice);
+            await remittanceInstance.depositFund(password1, duration.seconds(10),
+                {from: alice, value: allowedPasswords[1].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
-          });
-
-          it('if called not in time', async () => {
-            await web3.evm.increaseTime(duration.seconds(15));
-            await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.withdrawRemittance(allowedPasswords[0].code1, allowedPasswords[0].code2,
-                  {from: carol});
-            }, MAX_GAS);
           });
 
           it('if called with invalid password', async () => {
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.withdrawRemittance(allowedPasswords[1].code2, allowedPasswords[0].code1,
+              return remittanceInstance.withdrawRemittance(allowedPasswords[1].code,
                   {from: carol});
             }, MAX_GAS);
           });
 
           it('if called from invalid exchanger', async () => {
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.withdrawRemittance(allowedPasswords[0].code2, allowedPasswords[0].code1,
+              return remittanceInstance.withdrawRemittance(allowedPasswords[0].code,
                   {from: david});
             }, MAX_GAS);
           });
@@ -313,7 +284,7 @@ contract('Remittance', (accounts) => {
                 .should.be.fulfilled;
 
             await web3.eth.expectedExceptionPromise(() => {
-              return remittanceInstance.withdrawRemittance(allowedPasswords[0].code1, allowedPasswords[0].code2,
+              return remittanceInstance.withdrawRemittance(allowedPasswords[0].code,
                   {from: carol});
             }, MAX_GAS);
           });
@@ -324,14 +295,12 @@ contract('Remittance', (accounts) => {
         describe('allowed', () => {
           let password1;
           beforeEach('should deposit fund', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.seconds(10);
-            await remittanceInstance.depositFund(password, deadline,
+            await remittanceInstance.depositFund(password, duration.seconds(10),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
 
-            password1 = await remittanceInstance.oneTimePassword(allowedPasswords[1].code1, allowedPasswords[1].code2, carol);
-            await remittanceInstance.depositFund(password1, deadline,
+            password1 = await remittanceInstance.oneTimePassword(allowedPasswords[1].code, carol);
+            await remittanceInstance.depositFund(password1, duration.seconds(10),
                 {from: alice, value: allowedPasswords[1].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
           });
@@ -370,13 +339,11 @@ contract('Remittance', (accounts) => {
         describe('fail', () => {
           let password1;
           beforeEach('before deposit fund', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.seconds(10);
-            await remittanceInstance.depositFund(password, deadline,
+            await remittanceInstance.depositFund(password, duration.seconds(10),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
 
-            password1 = await remittanceInstance.oneTimePassword(allowedPasswords[1].code1, allowedPasswords[1].code2, carol);
+            password1 = await remittanceInstance.oneTimePassword(allowedPasswords[1].code, carol);
           });
 
           it('if called too early', async () => {
@@ -411,9 +378,7 @@ contract('Remittance', (accounts) => {
       describe('#kill()', () => {
         describe('allowed', () => {
           beforeEach('should deposit fund', async () => {
-            const latestBlock = await getBlock('latest');
-            const deadline = latestBlock.timestamp + duration.hours(1);
-            await remittanceInstance.depositFund(password, deadline,
+            await remittanceInstance.depositFund(password, duration.hours(1),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
           });
