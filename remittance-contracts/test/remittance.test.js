@@ -111,7 +111,7 @@ contract('Remittance', (accounts) => {
               const otp1 = await remittanceInstance.oneTimePassword(values.code, carol,
                   {from: alice});
 
-              otp1.should.be.equal(soliditySha3(values.code, carol));
+              otp1.should.be.equal(soliditySha3(remittanceInstance.address, values.code, carol));
             });
           });
         });
@@ -138,13 +138,13 @@ contract('Remittance', (accounts) => {
           it('if called with valid code and amount ', async () => {
             const latestBlock = await getBlock('latest');
             const releaseTime = latestBlock.timestamp + duration.hours(1);
-            
+
             const result = await remittanceInstance.depositFund(password, duration.hours(1),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS});
 
             result.logs[0].event.should.be.equal('EventDepositFund');
             result.logs[0].args.caller.should.be.equal(alice);
-            result.logs[0].args.password.should.be.equal(soliditySha3(allowedPasswords[0].code, carol));
+            result.logs[0].args.password.should.be.equal(soliditySha3(remittanceInstance.address, allowedPasswords[0].code, carol));
             result.logs[0].args.releaseTime.should.be.eq.BN(releaseTime);
             result.logs[0].args.etherAmount.should.be.eq.BN(allowedPasswords[0].etherAmount);
           });
@@ -157,7 +157,7 @@ contract('Remittance', (accounts) => {
 
             result.logs[0].event.should.be.equal('EventDepositFund');
             result.logs[0].args.caller.should.be.equal(david);
-            result.logs[0].args.password.should.be.equal(soliditySha3(allowedPasswords[0].code, carol));
+            result.logs[0].args.password.should.be.equal(soliditySha3(remittanceInstance.address, allowedPasswords[0].code, carol));
             result.logs[0].args.releaseTime.should.be.eq.BN(releaseTime);
             result.logs[0].args.etherAmount.should.be.eq.BN(allowedPasswords[0].etherAmount);
           });

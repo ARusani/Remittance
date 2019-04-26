@@ -11,12 +11,12 @@ contract Stoppable is Ownable {
     bool private stopped;
 
     modifier notStopped() {
-        require(!stopped);
+        require(!stopped, "Contract is in stopped state");
         _;
     }
 
     modifier asStopped() {
-        require(stopped);
+        require(stopped, "Contract is not in stopped state");
         _;
     }
 

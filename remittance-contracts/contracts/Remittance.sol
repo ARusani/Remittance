@@ -52,10 +52,10 @@ contract Remittance is Stoppable {
     }
 
     /* Generate a unique password that is not possible to reuse deposit */
-    function oneTimePassword(bytes32 _code, address _beneficiaryAddress) public pure returns(bytes32 password) {
+    function oneTimePassword(bytes32 _code, address _beneficiaryAddress) public view returns(bytes32 password) {
         require(_code != 0, "Second code is null");
         require(_beneficiaryAddress != address(0), "_beneficiaryAddress is null");
-        return keccak256(abi.encodePacked(_code,_beneficiaryAddress));
+        return keccak256(abi.encodePacked(this, _code, _beneficiaryAddress));
     }
 
     function depositFund(bytes32 _password, uint256 _deadline) public payable notStopped {
@@ -67,7 +67,7 @@ contract Remittance is Stoppable {
         require (fund.sender == address(0), "_password already used");
 
         fund.sender = msg.sender;
-        fund.etherAmount =  msg.value;
+        fund.etherAmount = msg.value;
         fund.releaseTime = now + _deadline;
 
         emit EventDepositFund(msg.sender, _password, fund.releaseTime,  msg.value);
@@ -76,9 +76,8 @@ contract Remittance is Stoppable {
     function withdrawRemittance(bytes32 _code) public notStopped {
         bytes32 password = oneTimePassword(_code,msg.sender);
         Fund storage fund = funds[password];
-
         uint256 etherAmount = fund.etherAmount;
-       
+
         require(fund.sender != address(0), "Deposit not exist");
 
         fund.etherAmount = 0;
