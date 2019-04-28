@@ -6,6 +6,7 @@
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "react-scripts": "3.0.0",
+    "react-select": "^2.4.3",
     "remittance-contracts": "^1.0.0",
     "truffle-contract": "3.0.6",
     "web3": "1.0.0-beta.37"
@@ -35,6 +36,11 @@
   "devDependencies": {
     "eslint": "^5.16.0",
     "eslint-config-google": "^0.12.0",
-    "eslint-plugin-react": "^7.12.4"
+    "eslint-config-standard": "^12.0.0",
+    "eslint-plugin-import": "^2.17.2",
+    "eslint-plugin-node": "^8.0.1",
+    "eslint-plugin-promise": "^4.1.1",
+    "eslint-plugin-react": "^7.12.4",
+    "eslint-plugin-standard": "^4.0.0"
   }
 }

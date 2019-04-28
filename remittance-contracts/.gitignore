@@ -6,3 +6,4 @@ coverageEnv/
 package-lock.json
 coverage.json
 .solcover.js
+allFiredEvents

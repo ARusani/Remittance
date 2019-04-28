@@ -1,107 +1,223 @@
+/* eslint-disable require-jsdoc */
 import React from 'react';
 import './App.css';
 import truffleContract from 'truffle-contract';
 import remittanceJson from '../../node_modules/remittance-contracts/build/contracts/Remittance.json';
 import Web3 from 'web3';
+import logo from './B9LabEthereum.png';
 
 class App extends React.Component {
-
   constructor(props) {
     super(props);
     this.state = {
-      web3: null, 
-      accounts: null, 
-      contract: null 
-    }
+      web3: null,
+      accounts: null,
+      instance: null,
+      exchangeAddress: 'not selected',
+      payerAddress: 'not selected',
+    };
+    this.handleAddressChange = this.handleAddressChange.bind(this);
+    this.deposit = this.deposit.bind(this);
   };
 
-  componentDidMount = async () => {
+  async componentDidMount() {
     try {
       // Get network provider and web3 instance.
-      const web3 = new Web3(Web3.givenProvider || new Web3.providers.HttpProvider('http://localhost:9545'));
-      console.log(web3)
+      const web3 = new Web3(Web3.givenProvider || new Web3.providers.HttpProvider('http://localhost:8545'));
 
       web3.eth.getTransactionReceiptMined = require('../../node_modules/remittance-contracts/gistLepretre/getTransactionReceiptMined.js');
-      
+
       // Use web3 to get the user's accounts.
       const accounts = await web3.eth.getAccounts();
-      console.log('accounts[0]=',accounts[0]);
 
       const remittanceContract = truffleContract(remittanceJson);
       remittanceContract.setProvider(web3.currentProvider);
-     
-       if (typeof remittanceContract.currentProvider.sendAsync !== "function") {
+
+      if (typeof remittanceContract.currentProvider.sendAsync !== 'function') {
         remittanceContract.currentProvider.sendAsync = function() {
-            return remittanceContract.currentProvider.send.apply(
+          return remittanceContract.currentProvider.send.apply(
               remittanceContract.currentProvider, arguments
-            );
+          );
         };
-      }; 
+      };
 
       const instance = await remittanceContract.deployed();
-      console.log(instance);
 
       // Set web3, accounts, and contract to the state, and then proceed with an
       // example of interacting with the contract's methods.
-      this.setState({ web3: web3, accounts: accounts, contract: instance });
-      this.addEventListener(this);
+      this.setState({web3: web3, accounts: accounts, instance: instance, payerAddress: accounts[0]});
+      // this.addEventListener(this);
     } catch (error) {
       // Catch any errors for any of the above operations.
       alert(
-        `Failed to load web3, accounts, or contract. Check console for details.`
+          `Failed to load web3, accounts, or contract. Check console for details.`
       );
       console.log(error);
     }
   };
 
-  otp = async (event) => {
-     try {
-        const { web3, accounts, contract } = this.state;
-        const {toWei, sha3} = web3.utils;
-
-        const result = await contract.otp(sha3(event.target.Password1.value), sha3(event.target.Password2.value), toWei(event.target.etherAmount.value), { from: accounts[0] });
-        console.log("set receipt status", result.receipt.status);
-        if (parseInt(result.receipt.status) !== 1) {
-          throw new Error("Failed to set value");
-      }
-    } catch(error) {
-      console.log(error);
-    } 
+  async handleAddressChange(event) {
+    const {value} = event.target;
+    this.setState({'exchangeAddress': value});
   };
 
-  addEventListener = async (component) => {
-    const eventDepositFund = this.state.contract.EventDepositFund({}, { fromBlock: 0, toBlock: 'latest' });
+  async deposit(event) {
+    try {
+      const {web3, instance, exchangeAddress, payerAddress} = this.state;
+      const {fromAscii} = web3.utils;
+
+      const code = fromAscii(event.target.password.value).padEnd(66, '0');
+      const deadline = event.target.deadline.value;
+
+      console.log(instance);
+      const codeHash = await instance.oneTimePassword(code,exchangeAddress,
+          {from: payerAddress});
+
+      const result = await instance.depositFund(codeHash, deadline,
+          {from: payerAddress});
+
+      console.log('set receipt status', result.receipt.status);
+      if (parseInt(result.receipt.status) !== 1) {
+        throw new Error('Failed to set depositFund');
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  async withdraw(event) {
+    try {
+      const {web3, instance, exchangeAddress} = this.state;
+      const {fromAscii} = web3.utils;
+
+      const code = fromAscii(event.target.password.value).padEnd(66, '0');
+
+      const codeHash = await instance.oneTimePassword(code, exchangeAddress,
+          {from: exchangeAddress});
+
+      const result = await instance.withdrawRemittance(codeHash,
+          {from: exchangeAddress});
+
+      console.log('set receipt status', result.receipt.status);
+      if (parseInt(result.receipt.status) !== 1) {
+        throw new Error('Failed to set depositFund');
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  async cancelRemittance(event) {
+    try {
+      const {web3, instance, exchangeAddress, payerAddress} = this.state;
+      const {fromAscii} = web3.utils;
+
+      const code = fromAscii(event.target.password.value).padEnd(66, '0');
+
+      const codeHash = await instance.oneTimePassword(code, exchangeAddress,
+          {from: payerAddress});
+
+      const result = await instance.cancelRemittance(codeHash,
+          {from: payerAddress});
+
+      console.log('set receipt status', result.receipt.status);
+      if (parseInt(result.receipt.status) !== 1) {
+        throw new Error('Failed to set depositFund');
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  async addEventListener(component) {
+    console.log(component);
+    const eventDepositFund = this.state.instance.EventDepositFund({},
+        {fromBlock: 0, toBlock: 'latest'});
     eventDepositFund.watch(function(err, result) {
       if (err) {
         console.log(err);
         return;
       }
-      console.log("EventDepositFund received, value: " + result.args.etherAmount.toString(10));
-    })
-  };  
+      console.log('EventDepositFund received, value: '
+      + result.args.etherAmount.toString(10));
+    });
+  };
 
-  render(){
-    if (!this.state.web3) {
+  // eslint-disable-next-line require-jsdoc
+  render() {
+    if (!this.state.accounts) {
       return <div>Loading Web3, accounts, and contract...</div>;
-    }    
+    }
     return (
-      <div className="App">
-        <header className="App-header">
-        <h1 style={{ fontSize: '32px', marginBottom: '20px' }}>Remittance</h1>
-        <span id="insTrans"></span>
-        <h2 style={{ fontSize: '20px', marginBottom: '20px' }}>OTP</h2>
-        <form onSubmit={this.otp.bind(this)}>
-          <label>Password1:</label>
-          <input type="text" name="Password1" />
-          <label>Password2:</label>
-          <input type="text" name="Password2" />
-          <label>Ethers Amount:</label>
-          <input type="text" name="etherAmount" />
-          <button type="submit">Generate</button>
-        </form>  
-        </header>
+      <div style={{maxWidth: '600px', margin: '100px auto 0 auto'}}>
+        <img src={logo} alt="App-logo"/>
+        <h1 style={{fontSize: '32px', marginBottom: '20px'}}>
+          Remittance Contract</h1>
+        <hr></hr>
+        <h2 style={{fontSize: '20px', marginBottom: '20px'}}>Deposit</h2>
+        <form onSubmit={this.deposit} style={{marginBottom: '30px'}}>
+          <br></br>
+          <input type="password" name="password" placeholder="secret code"/>
+          <br></br>
+          <input type="deadline" name="deadline" placeholder="deadline"/>        
+          <br></br>
+          <select
+            value={this.state.exchangeAddress}
+            onChange={this.handleAddressChange}
+            name="exchangeAddress">
+            <option value="">Select Address</option>
+            <option value={this.state.accounts[0]}>Alice</option>
+            <option value={this.state.accounts[1]}>David</option>
+            <option value={this.state.accounts[2]}>Carol</option>
+          </select>
+          <p>Selected Exchanger Address: "{this.state.exchangeAddress}" </p>
+          <br />
+          <br />
+          <button>Deposit Fund</button>
+        </form>
+        <hr></hr>
+        <h2 style={{fontSize: '20px', marginBottom: '20px'}}>Withdraw</h2>
+        <form onSubmit={this.withdraw} style={{marginBottom: '30px'}}>
+          <br></br>
+          <input type="password" name="password" placeholder="secret code"/>
+          <br></br>
+          <select
+            value={this.state.exchangeAddress}
+            onChange={this.handleAddressChange}
+            name="exchangeAddress">
+            <option value="">Select Address</option>
+            <option value={this.state.accounts[0]}>Alice</option>
+            <option value={this.state.accounts[1]}>David</option>
+            <option value={this.state.accounts[2]}>Carol</option>
+          </select>
+          <p>Selected Exchanger Address: "{this.state.exchangeAddress}" </p>
+          <br />
+          <br />
+          <button>Withdraw Remittance</button>
+        </form>
+        <hr></hr>
+        <h2 style={{fontSize: '20px', marginBottom: '20px'}}>Cancel Remittance</h2>
+        <form onSubmit={this.cancelRemittance} style={{marginBottom: '30px'}}>
+          <br></br>
+          <input type="password" name="password" placeholder="secret code"/>
+          <br></br>
+          <select
+            value={this.state.payerAddress}
+            onChange={this.handleAddressChange}
+            name="payerAddress">
+            <option value="">Select Address</option>
+            <option value={this.state.accounts[0]}>Alice</option>
+            <option value={this.state.accounts[1]}>David</option>
+            <option value={this.state.accounts[2]}>Carol</option>
+          </select>
+          <p>Selected Payer Address: "{this.state.payerAddress}" </p>
+          <br />
+          <br />
+          <button>Cancel Remittance</button>
+        </form>
+        <hr></hr>
       </div>
-    )
+    );
   }
 }
 
