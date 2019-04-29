@@ -15,16 +15,20 @@ class App extends React.Component {
       instance: null,
       exchangeAddress: 'not selected',
       payerAddress: 'not selected',
+      event: '',
     };
     this.handleAddressChange = this.handleAddressChange.bind(this);
+    this.addEventListener = this.addEventListener.bind(this);
     this.deposit = this.deposit.bind(this);
+    this.withdraw = this.withdraw.bind(this);
+    this.cancelRemittance = this.cancelRemittance.bind(this);
   };
 
   async componentDidMount() {
     try {
       // Get network provider and web3 instance.
-      const web3 = new Web3(Web3.givenProvider || new Web3.providers.HttpProvider('http://localhost:8545'));
-
+      const web3 = new Web3(Web3.givenProvider || new Web3.providers.HttpProvider('http://localhost:9545'));
+      console.log(web3.version);
       web3.eth.getTransactionReceiptMined = require('../../node_modules/remittance-contracts/gistLepretre/getTransactionReceiptMined.js');
 
       // Use web3 to get the user's accounts.
@@ -46,7 +50,7 @@ class App extends React.Component {
       // Set web3, accounts, and contract to the state, and then proceed with an
       // example of interacting with the contract's methods.
       this.setState({web3: web3, accounts: accounts, instance: instance, payerAddress: accounts[0]});
-      // this.addEventListener(this);
+      this.addEventListener(this);
     } catch (error) {
       // Catch any errors for any of the above operations.
       alert(
@@ -62,19 +66,23 @@ class App extends React.Component {
   };
 
   async deposit(event) {
+    event.preventDefault();
     try {
       const {web3, instance, exchangeAddress, payerAddress} = this.state;
-      const {fromAscii} = web3.utils;
+      const {fromAscii, toWei} = web3.utils;
 
       const code = fromAscii(event.target.password.value).padEnd(66, '0');
       const deadline = event.target.deadline.value;
+      const etherAmount = toWei(event.target.etherAmount.value, 'ether');
 
       console.log(instance);
-      const codeHash = await instance.oneTimePassword(code,exchangeAddress,
+      const codeHash = await instance.oneTimePassword(code, exchangeAddress,
           {from: payerAddress});
+      console.log('code: ', codeHash);
+      console.log('exchangeAddress: ', exchangeAddress);
 
       const result = await instance.depositFund(codeHash, deadline,
-          {from: payerAddress});
+          {from: payerAddress, value: etherAmount});
 
       console.log('set receipt status', result.receipt.status);
       if (parseInt(result.receipt.status) !== 1) {
@@ -82,20 +90,21 @@ class App extends React.Component {
       }
     } catch (error) {
       console.log(error);
+      this.setState({event: error.toString()});
     }
   };
 
   async withdraw(event) {
+    event.preventDefault();
     try {
       const {web3, instance, exchangeAddress} = this.state;
       const {fromAscii} = web3.utils;
 
       const code = fromAscii(event.target.password.value).padEnd(66, '0');
 
-      const codeHash = await instance.oneTimePassword(code, exchangeAddress,
-          {from: exchangeAddress});
-
-      const result = await instance.withdrawRemittance(codeHash,
+      console.log('code: ', code);
+      console.log('exchangeAddress: ', exchangeAddress);
+      const result = await instance.withdrawRemittance(code,
           {from: exchangeAddress});
 
       console.log('set receipt status', result.receipt.status);
@@ -104,10 +113,12 @@ class App extends React.Component {
       }
     } catch (error) {
       console.log(error);
+      this.setState({event: error.toString()});
     }
   };
 
   async cancelRemittance(event) {
+    event.preventDefault();
     try {
       const {web3, instance, exchangeAddress, payerAddress} = this.state;
       const {fromAscii} = web3.utils;
@@ -130,16 +141,40 @@ class App extends React.Component {
   };
 
   async addEventListener(component) {
-    console.log(component);
     const eventDepositFund = this.state.instance.EventDepositFund({},
         {fromBlock: 0, toBlock: 'latest'});
+    console.log(eventDepositFund);
     eventDepositFund.watch(function(err, result) {
       if (err) {
         console.log(err);
+        component.setState({event: err});
         return;
       }
       console.log('EventDepositFund received, value: '
       + result.args.etherAmount.toString(10));
+      component.setState({event: result.args.etherAmount.toString(10)});
+    });
+
+    const eventWithdrawRemittance = this.state.instance.EventWithdrawRemittance({},
+        {fromBlock: 0, toBlock: 'latest'});
+    eventWithdrawRemittance.watch(function(err, result) {
+      if (err) {
+        console.log(err);
+        return;
+      }
+      console.log('EventWithdrawRemittance received, value: '
+      + result.args.etherAmount.toString(10));
+    });
+
+    const eventCancelRemittance = this.state.instance.EventCancelRemittance({},
+        {fromBlock: 0, toBlock: 'latest'});
+    eventCancelRemittance.watch(function(err, result) {
+      if (err) {
+        console.log(err);
+        return;
+      }
+      console.log('EventCancelRemittance received, value: '
+      + result.args.etherDrop.toString(10));
     });
   };
 
@@ -153,13 +188,16 @@ class App extends React.Component {
         <img src={logo} alt="App-logo"/>
         <h1 style={{fontSize: '32px', marginBottom: '20px'}}>
           Remittance Contract</h1>
+        <p>Event result: {this.state.event}</p>
         <hr></hr>
         <h2 style={{fontSize: '20px', marginBottom: '20px'}}>Deposit</h2>
         <form onSubmit={this.deposit} style={{marginBottom: '30px'}}>
           <br></br>
           <input type="password" name="password" placeholder="secret code"/>
           <br></br>
-          <input type="deadline" name="deadline" placeholder="deadline"/>        
+          <input type="deadline" name="deadline" placeholder="deadline"/>
+          <br></br>
+          <input type="etherAmount" name="etherAmount" placeholder="Ether Amount"/>
           <br></br>
           <select
             value={this.state.exchangeAddress}
