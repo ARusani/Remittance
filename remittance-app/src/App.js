@@ -5,6 +5,7 @@ import truffleContract from 'truffle-contract';
 import remittanceJson from '../../node_modules/remittance-contracts/build/contracts/Remittance.json';
 import Web3 from 'web3';
 import logo from './B9LabEthereum.png';
+import loader from './Loading_icon.gif';
 
 class App extends React.Component {
   constructor(props) {
@@ -16,6 +17,7 @@ class App extends React.Component {
       exchangeAddress: 'not selected',
       payerAddress: 'not selected',
       event: '',
+      showLoader: false,
     };
     this.handleAddressChange = this.handleAddressChange.bind(this);
     this.addEventListener = this.addEventListener.bind(this);
@@ -75,6 +77,8 @@ class App extends React.Component {
       const deadline = event.target.deadline.value;
       const etherAmount = toWei(event.target.etherAmount.value, 'ether');
 
+      this.setState({showLoader: true});
+
       console.log(instance);
       const codeHash = await instance.oneTimePassword(code, exchangeAddress,
           {from: payerAddress});
@@ -91,6 +95,7 @@ class App extends React.Component {
     } catch (error) {
       console.log(error);
       this.setState({event: error.toString()});
+      this.setState({showLoader: false});
     }
   };
 
@@ -104,6 +109,9 @@ class App extends React.Component {
 
       console.log('code: ', code);
       console.log('exchangeAddress: ', exchangeAddress);
+
+      this.setState({showLoader: true});
+
       const result = await instance.withdrawRemittance(code,
           {from: exchangeAddress});
 
@@ -114,6 +122,7 @@ class App extends React.Component {
     } catch (error) {
       console.log(error);
       this.setState({event: error.toString()});
+      this.setState({showLoader: false});
     }
   };
 
@@ -124,6 +133,8 @@ class App extends React.Component {
       const {fromAscii} = web3.utils;
 
       const code = fromAscii(event.target.password.value).padEnd(66, '0');
+
+      this.setState({showLoader: true});
 
       const codeHash = await instance.oneTimePassword(code, exchangeAddress,
           {from: payerAddress});
@@ -137,6 +148,8 @@ class App extends React.Component {
       }
     } catch (error) {
       console.log(error);
+      this.setState({event: error.toString()});
+      this.setState({showLoader: false});
     }
   };
 
@@ -145,6 +158,8 @@ class App extends React.Component {
         {fromBlock: 0, toBlock: 'latest'});
     console.log(eventDepositFund);
     eventDepositFund.watch(function(err, result) {
+      component.setState({showLoader: false});
+
       if (err) {
         console.log(err);
         component.setState({event: err});
@@ -158,6 +173,8 @@ class App extends React.Component {
     const eventWithdrawRemittance = this.state.instance.EventWithdrawRemittance({},
         {fromBlock: 0, toBlock: 'latest'});
     eventWithdrawRemittance.watch(function(err, result) {
+      component.setState({showLoader: false});
+
       if (err) {
         console.log(err);
         return;
@@ -169,6 +186,7 @@ class App extends React.Component {
     const eventCancelRemittance = this.state.instance.EventCancelRemittance({},
         {fromBlock: 0, toBlock: 'latest'});
     eventCancelRemittance.watch(function(err, result) {
+      component.setState({showLoader: false});
       if (err) {
         console.log(err);
         return;
@@ -184,8 +202,9 @@ class App extends React.Component {
       return <div>Loading Web3, accounts, and contract...</div>;
     }
     return (
-      <div style={{maxWidth: '600px', margin: '100px auto 0 auto'}}>
-        <img src={logo} alt="App-logo"/>
+      <div class="spinner-border fast" role="status" style={{maxWidth: '600px', margin: '100px auto 0 auto'}}>
+        <img src={logo} className="logo" alt="logo"/>
+        { this.state.showLoader ? <img src={loader} alt="loader"/> : null }
         <h1 style={{fontSize: '32px', marginBottom: '20px'}}>
           Remittance Contract</h1>
         <p>Event result: {this.state.event}</p>
