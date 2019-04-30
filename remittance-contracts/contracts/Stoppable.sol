@@ -5,17 +5,17 @@ import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 contract Stoppable is Ownable {
 
     event EventStopped(address indexed caller);
-    event EventUnStopped(address indexed caller);
+    event EventRun(address indexed caller);
     event EventContractKilled(address indexed caller, uint256 balance);
 
     bool private stopped;
 
-    modifier notStopped() {
+    modifier onlyRunning() {
         require(!stopped, "Contract is in stopped state");
         _;
     }
 
-    modifier asStopped() {
+    modifier onlyStopped() {
         require(stopped, "Contract is not in stopped state");
         _;
     }
@@ -24,22 +24,22 @@ contract Stoppable is Ownable {
         stopped = _asStopped;
     }
 
-    function stop() public onlyOwner notStopped  {
+    function stop() public onlyOwner onlyRunning  {
         stopped = true;
 
         emit EventStopped(msg.sender);
     }
 
-    function unStop() public onlyOwner asStopped {
+    function run() public onlyOwner onlyStopped {
         stopped = false;
-        emit EventUnStopped(msg.sender);
+        emit EventRun(msg.sender);
     }
 
     function isStopped() public view returns (bool) {
         return stopped;
     }
 
-    function kill() public onlyOwner {
+    function kill() public onlyOwner onlyStopped {
         emit EventContractKilled(msg.sender, address(this).balance);
         selfdestruct(msg.sender);
     }

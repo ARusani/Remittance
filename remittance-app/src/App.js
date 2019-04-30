@@ -78,10 +78,13 @@ class App extends React.Component {
       this.setState({showLoader: true});
 
       console.log(instance);
-      const codeHash = await instance.oneTimePassword(code, exchangeAddress,
+      const codeHash = await instance.oneTimePassword.call(code, exchangeAddress,
           {from: payerAddress});
       console.log('code: ', codeHash);
       console.log('exchangeAddress: ', exchangeAddress);
+
+      await instance.depositFund.call('0', deadline,
+          {from: payerAddress, value: etherAmount});
 
       const result = await instance.depositFund(codeHash, deadline,
           {from: payerAddress, value: etherAmount});
@@ -110,6 +113,9 @@ class App extends React.Component {
 
       this.setState({showLoader: true});
 
+      await instance.withdrawRemittance.call(code,
+          {from: exchangeAddress});
+
       const result = await instance.withdrawRemittance(code,
           {from: exchangeAddress});
 
@@ -134,9 +140,12 @@ class App extends React.Component {
 
       this.setState({showLoader: true});
 
-      const codeHash = await instance.oneTimePassword(code, exchangeAddress,
+      const codeHash = await instance.oneTimePassword.call(code, exchangeAddress,
           {from: payerAddress});
 
+      await instance.cancelRemittance(codeHash,
+          {from: payerAddress});
+  
       const result = await instance.cancelRemittance(codeHash,
           {from: payerAddress});
 
@@ -200,7 +209,7 @@ class App extends React.Component {
       return <div>Loading Web3, accounts, and contract...</div>;
     }
     return (
-      <div class="spinner-border fast" role="status" style={{maxWidth: '600px', margin: '100px auto 0 auto'}}>
+      <div className="spinner-border fast" role="status" style={{maxWidth: '600px', margin: '100px auto 0 auto'}}>
         <img src={logo} className="logo" alt="logo"/>
         { this.state.showLoader ? <img src={loader} alt="loader"/> : null }
         <h1 style={{fontSize: '32px', marginBottom: '20px'}}>

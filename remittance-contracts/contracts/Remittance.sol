@@ -53,12 +53,12 @@ contract Remittance is Stoppable {
 
     /* Generate a unique password that is not possible to reuse deposit */
     function oneTimePassword(bytes32 _code, address _beneficiaryAddress) public view returns(bytes32 password) {
-        require(_code != 0, "Second code is null");
+        require(_code != 0, "Password is null");
         require(_beneficiaryAddress != address(0), "_beneficiaryAddress is null");
         return keccak256(abi.encodePacked(this, _code, _beneficiaryAddress));
     }
 
-    function depositFund(bytes32 _password, uint256 _deadline) public payable notStopped {
+    function depositFund(bytes32 _password, uint256 _deadline) public payable onlyRunning {
         require(0 < _deadline && _deadline < maxFarInTheFuture, "deadline is not valid");
 
         require(msg.value != 0, "Funds deposited is zero");
@@ -68,17 +68,18 @@ contract Remittance is Stoppable {
 
         fund.sender = msg.sender;
         fund.etherAmount = msg.value;
-        fund.releaseTime = now + _deadline;
+        fund.releaseTime = now.add(_deadline);
 
         emit EventDepositFund(msg.sender, _password, fund.releaseTime,  msg.value);
     }
 
-    function withdrawRemittance(bytes32 _code) public notStopped {
+    function withdrawRemittance(bytes32 _code) public onlyRunning {
         bytes32 password = oneTimePassword(_code,msg.sender);
         Fund storage fund = funds[password];
         uint256 etherAmount = fund.etherAmount;
 
         require(fund.sender != address(0), "Deposit not exist");
+        require(fund.etherAmount != 0, "Fund does not exist");
 
         fund.etherAmount = 0;
         fund.releaseTime = 0;
@@ -88,7 +89,7 @@ contract Remittance is Stoppable {
         msg.sender.transfer(etherAmount);
     }
 
-    function cancelRemittance(bytes32 _password) public notStopped {
+    function cancelRemittance(bytes32 _password) public onlyRunning {
         Fund storage fund = funds[_password];
         require(fund.etherAmount != 0, "Fund does not exist");
         require(msg.sender == fund.sender, "Invalid Claimer");

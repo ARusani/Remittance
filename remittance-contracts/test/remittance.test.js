@@ -288,6 +288,16 @@ contract('Remittance', (accounts) => {
                   {from: carol});
             }, MAX_GAS);
           });
+
+          it('if called two times', async () => {
+            await remittanceInstance.withdrawRemittance(allowedPasswords[0].code,
+                {from: carol});
+
+            await web3.eth.expectedExceptionPromise(() => {
+              return remittanceInstance.withdrawRemittance(allowedPasswords[0].code,
+                  {from: carol});
+            }, MAX_GAS);
+          });          
         });
       });
 
@@ -381,9 +391,10 @@ contract('Remittance', (accounts) => {
             await remittanceInstance.depositFund(password, duration.hours(1),
                 {from: alice, value: allowedPasswords[0].etherAmount, gas: MAX_GAS})
                 .should.be.fulfilled;
+            await remittanceInstance.stop({from: alice}).should.be.fulfilled;
           });
 
-          it('if called from owner', async () => {
+          it('if called from owner onlyStopped', async () => {
             const result = await remittanceInstance.kill({from: alice});
 
             result.logs[0].event.should.be.equal('EventContractKilled');
@@ -406,11 +417,17 @@ contract('Remittance', (accounts) => {
         });
 
         describe('fail', () => {
+          it('if called in running state', async () => {
+            await web3.eth.expectedExceptionPromise(() => {
+              return remittanceInstance.kill({from: alice, gas: MAX_GAS});
+            }, MAX_GAS);
+          });
           it('if called from non owner', async () => {
+            await remittanceInstance.stop({from: alice}).should.be.fulfilled;
             await web3.eth.expectedExceptionPromise(() => {
               return remittanceInstance.kill({from: carol, gas: MAX_GAS});
             }, MAX_GAS);
-          });
+          });          
         });
       });
     });
