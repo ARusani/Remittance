@@ -31,9 +31,7 @@ class App extends React.Component {
       // Get network provider and web3 instance.
       const web3 = new Web3(Web3.givenProvider || new Web3.providers.HttpProvider('http://localhost:9545'));
       console.log(web3.version);
-      web3.eth.getTransactionReceiptMined = require('../../node_modules/remittance-contracts/gistLepretre/getTransactionReceiptMined.js');
 
-      // Use web3 to get the user's accounts.
       const accounts = await web3.eth.getAccounts();
 
       const remittanceContract = truffleContract(remittanceJson);
