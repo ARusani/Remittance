@@ -78,7 +78,7 @@ class App extends React.Component {
       this.setState({showLoader: true});
 
       console.log(instance);
-      const codeHash = await instance.oneTimePassword.call(code, exchangeAddress,
+      const codeHash = await instance.oneTimeKeyCode.call(code, exchangeAddress,
           {from: payerAddress});
       console.log('code: ', codeHash);
       console.log('exchangeAddress: ', exchangeAddress);
@@ -140,7 +140,7 @@ class App extends React.Component {
 
       this.setState({showLoader: true});
 
-      const codeHash = await instance.oneTimePassword.call(code, exchangeAddress,
+      const codeHash = await instance.oneTimeKeyCode.call(code, exchangeAddress,
           {from: payerAddress});
 
       await instance.cancelRemittance(codeHash,
